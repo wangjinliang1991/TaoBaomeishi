@@ -12,18 +12,22 @@ import pymongo
 client = pymongo.MongoClient(MONGO_URL)
 db = client[MONGO_DB]
 
-browser = webdriver.Chrome()
+# browser = webdriver.Chrome()
+# 用PhantomJS作为浏览器
+browser = webdriver.PhantomJS(service_args=SERVICE_ARGS)
 wait = WebDriverWait(browser, 10)
-
+# 一般需要设置浏览器窗口大小
+browser.set_window_size(1400, 900)
 
 def search():
+    print('正在搜索...')
     try:
         browser.get('https://www.taobao.com')
         input = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, '#q')))
         submit = wait.until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, '#J_TSearchForm > div.search-button > button')))
-        input.send_keys('美食')
+        input.send_keys(KEYWORD)
         submit.click()
         total = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, '#mainsrp-pager > div > div > div > div.total')))
@@ -33,6 +37,7 @@ def search():
         return search()
 
 def next_page(page_number):
+    print('正在翻页', page_number)
     try:
         input = wait.until(
             EC.presence_of_element_located((By.CSS_SELECTOR, '#mainsrp-pager > div > div > div > div.form > input'))
@@ -73,11 +78,16 @@ def save_to_mongo(result):
         print('存储到MONGODB失败', result)
 
 def main():
-    total = search()
-    total = int(re.compile('(\d+)').search(total).group(1))
-    for i in range(2, total + 1):
-        next_page(i)
-
+    """try/finally架构保证最后正常关闭浏览器，Exception保证忽略异常"""
+    try:
+        total = search()
+        total = int(re.compile('(\d+)').search(total).group(1))
+        for i in range(2, total + 1):
+            next_page(i)
+    except Exception:
+        print('出错啦')
+    finally:
+        browser.close()
 if __name__ == "__main__":
     main()
 
